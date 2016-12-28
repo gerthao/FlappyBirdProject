@@ -1,0 +1,371 @@
+<!-- Ger Thao
+	used Max Wihlborg's flappy tutorial and his Sprite.js as a reference
+	for the final project
+	https://www.youtube.com/watch?v=riUx2G75mas
+-->
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Final Project</title>
+	<script src="sprite.js"></script>
+	<style>
+	body{
+		background-color: black;
+	}
+	canvas {
+		display: block;
+		position: absolute;
+		margin: auto;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		right: 0;
+	}
+	</style>
+</head>
+<body>
+<script>
+var music = new Audio("smb3.mp3");
+
+var
+keySPACE = false,
+keySPACEHeld = false,
+keyJ = false,
+keyJHeld = false,
+keyW = false,
+keyA = false,
+keyS = false,
+keyD = false;
+
+var
+canvas,
+ctx,
+width,
+height,
+
+fgpos = 0,
+bgpos = 0,
+frames = 0,
+score = 0,
+best = localStorage.getItem("best") || 0,
+okbtn,
+bullets = {
+	_list: [],
+	reset: function(){this._list = [];},
+	update: function(){
+		for(var i = 0; i < this._list.length; i++){
+			this._list[i].update();
+			if ((this._list[i].x < this._list[i].width) || this._list[i].marked) {
+				this._list.splice(i, 1);
+				i--;
+			}
+		}
+	},
+	draw: function(ctx){
+		for(var i = 0; i < this._list.length; i++){
+			this._list[i].draw(ctx);
+		}
+	}
+},
+currentstate,
+states = {
+	Splash: 0, Game: 1, Score: 2
+},
+bird = {
+	x: 60,
+	y: 0,
+	frame: 0,
+	velocity: 0,
+	animation: [0, 1, 2, 1],
+	rotation: 0,
+	gravity: 0.25,
+	update: function(){
+		var n = currentstate === states.Splash ? 10 : 5;
+		this.frame += frames%n === 0 ? 1 : 0;
+		this.frame %= this.animation.length;
+		pressKey();
+		if(currentstate === states.Splash){
+			this.x = 60;
+			this.y = height-280 + 5*Math.cos(frames/10);
+		} else {
+			if(this.y >= height-s_fg.height-10){this.y = height-s_fg.height-10;}
+			if(this.y <= 10){this.y = 10;}
+			if(this.x <= 14){this.x = 14};
+			if(this.x >= width-14){this.x = width-14};
+		}
+	},
+	draw: function(ctx){
+		ctx.save();
+		ctx.translate(this.x, this.y);
+		var n = this.animation[this.frame];
+		s_bird[n].draw(ctx,
+			-s_bird[n].width/2,
+			-s_bird[n].height/2);
+		ctx.restore();
+	}
+},
+enemies = {
+	_list: [],
+	reset: function(){
+		this._list = [];
+	},
+	update: function(){
+		if(frames%6 === 0){
+			this._list.push({
+				x: 700,
+				y: Math.random()*540,
+				spin: Math.random()*9,
+				frame: 0,
+				velocity: -7,
+				animation: [0, 1, 2, 1],
+				rotation: 0,
+				gravity: 0.25,
+				sty: Math.random()*10,
+				life: this.sty > 8 ? 3 : 2,
+				marked: false,
+				update: function(){
+					var n = currentstate === states.Splash ? 10 : 5;
+					this.frame += frames%n === 0 ? 1 : 0;
+					this.frame %= this.animation.length;
+					if((this.sty >= 2 && this.sty <= 5) || (this.sty >= 8 && this.sty <= 9)){
+						this.y = this.y + this.spin*Math.sin(frames/10);
+					}
+					if(this.y >= height-s_fg.height-10){this.y = height-s_fg.height-10;}
+					this.x += this.velocity;
+					if(this.collide(bird)){
+						var deathsound = new Audio("hit_hurt.wav");
+						deathsound.play();
+							currentstate = states.Score;
+					}
+					if(bullets._list.length > 0){
+						for(var i = 0; i < bullets._list.length; i++){
+							if(this.collide(bullets._list[i])){
+								var damage = new Audio("hit_hurt3.wav");
+								damage.play();
+								this.life--;
+								this.marked = this.life === 0 ? true : false;
+								bullets._list[i].marked = true;
+								score += 50;
+							}
+						}
+					}
+				},
+				draw: function(ctx){
+					ctx.save();
+					ctx.translate(this.x, this.y);
+					ctx.scale(-1, 1);
+					var n = this.animation[this.frame];
+					if(this.sty >= 9){
+						ctx.scale(2, 2);
+					}
+					if(this.sty >= 6 && this.sty <= 7){
+						ctx.rotate(Math.PI*n);
+
+					}
+					s_bird[n].draw(ctx,-s_bird[n].width/2,-s_bird[n].height/2);
+					ctx.restore();
+				},
+				collide: function(other){
+					var minX = this.x - 28;
+					var maxX = this.x + 28;
+					var minY = this.y - 28;
+					var maxY = this.y + 28;
+	        return (other.x >= minX && other.x <= maxX)
+						&& (other.y >= minY && other.y <= maxY);
+				}
+			});
+		}
+		for(var i = 0; i < this._list.length; i++){
+			this._list[i].update();
+			if(this._list[i].marked){
+				var dead = new Audio("hit_hurt2.wav");
+				dead.play();
+			}
+			if ((this._list[i].x < -this._list[i].width) || this._list[i].marked) {
+				this._list[i].marked = false;
+				this._list.splice(i, 1);
+				i--;
+			}
+		}
+	},
+	draw: function(ctx){
+		for(var i = 0; i < this._list.length; i++){
+			this._list[i].draw(ctx);
+		}
+	}
+};
+function main(){
+	canvas = document.createElement("canvas");
+	width = window.innerWidth;
+	height = window.innerHeight;
+	if(width >= 500){
+		width = 640; height = 520;
+		canvas.style.border = "1px solid #000";
+	}
+	canvas.width = width;
+	canvas.height = height;
+	ctx = canvas.getContext("2d");
+	currentstate = states.Splash;
+	document.body.appendChild(canvas);
+
+	var img = new Image();
+	img.onload = function(){
+		initSprites(this);
+		ctx.fillStyle = s_bg.color;
+		okbtn = {
+			x: (width - s_buttons.Ok.width)/2,
+			y: height - 200,
+			width: s_buttons.Ok.width,
+			height: s_buttons.Ok.height
+		}
+		run();
+	}
+	img.src = "sheet.png";
+}
+function run(){
+	var loop = function(){
+		update(); render();
+		window.requestAnimationFrame(loop, canvas);
+	}
+	window.requestAnimationFrame(loop, canvas);
+}
+function update(){
+	frames++;
+	if(currentstate !== states.Score){
+		bgpos = (bgpos-1) % (s_bg.width);
+		fgpos = (fgpos-2) % (s_fg.width);
+	} else{
+		bird.velocity += bird.gravity;
+		bird.y += bird.velocity;
+		best = Math.max(best, score);
+		localStorage.setItem("best", best);
+	}
+	if(currentstate === states.Game){
+		enemies.update();
+		bullets.update();
+		score += 1;
+	}
+	bird.update();
+}
+function render(){
+	ctx.fillRect(0, 0, width, height);
+	s_bg.draw(ctx, bgpos, height-s_bg.height);
+	s_bg.draw(ctx, bgpos+s_bg.width, height-s_bg.height);
+	s_bg.draw(ctx, bgpos+(2*s_bg.width), height-s_bg.height);
+	s_bg.draw(ctx, bgpos+(3*s_bg.width), height-s_bg.height);
+	s_bg.draw(ctx, bgpos+(4*s_bg.width), height-s_bg.height);
+	bird.draw(ctx);
+	enemies.draw(ctx);
+	bullets.draw(ctx);
+	s_fg.draw(ctx, fgpos, height-s_fg.height);
+	s_fg.draw(ctx, fgpos+s_fg.width, height-s_fg.height);
+	s_fg.draw(ctx, fgpos+(2*s_fg.width), height-s_fg.height);
+	s_fg.draw(ctx, fgpos+(3*s_fg.width), height-s_fg.height);
+	var width2 = width/2;
+	if(currentstate === states.Splash){
+		s_text.GetReady.draw(ctx, width2-s_text.GetReady.width/2, height-380);
+	}
+	if (currentstate === states.Score) {
+		s_text.GameOver.draw(ctx, width2 - s_text.GameOver.width/2, height-400);
+		s_score.draw(ctx, width2 - s_score.width/2, height-340);
+		s_buttons.Ok.draw(ctx, okbtn.x, okbtn.y);
+		s_numberS.draw(ctx, width2-47, height-304, score, null, 10);
+		s_numberS.draw(ctx, width2-47, height-262, best, null, 10);
+	} else {
+		s_numberB.draw(ctx, null, 20, score, width2);
+	}
+}
+
+document.addEventListener("keydown", keyDownHandler, false);
+document.addEventListener("keyup", keyUpHandler, false);
+function keyDownHandler(e){
+		if(e.keyCode === 32) keySPACE = true;
+    if(e.keyCode === 74) keyJ = true;
+    if(e.keyCode === 87) keyW = true;
+    if(e.keyCode === 65) keyA = true;
+    if(e.keyCode === 83) keyS = true;
+    if(e.keyCode === 68) keyD = true;
+}
+function keyUpHandler(e){
+		if(e.keyCode === 32) {keySPACE = false; keySPACEHeld = false;}
+    if(e.keyCode === 74) {keyJ = false; keyJHeld = false;}
+    if(e.keyCode === 87) keyW = false;
+    if(e.keyCode === 65) keyA = false;
+    if(e.keyCode === 83) {keyS = false;}
+    if(e.keyCode === 68) keyD = false;
+}
+function shoot(){
+    if(!keyJHeld){
+			var aud = new Audio("laser_shoot.wav");
+			aud.play();
+			bullets._list.push({
+				x: bird.x,
+				y: bird.y,
+				frame: 0,
+				velocity: 6,
+				animation: [0, 1, 2, 1],
+				rotation: 0,
+				marked: false,
+				gravity: 0.25,
+				update: function(){
+					var n = currentstate === states.Splash ? 10 : 5;
+					this.frame += frames%n === 0 ? 1 : 0;
+					this.frame %= this.animation.length;
+					this.x += this.velocity;
+				},
+				draw: function(ctx){
+					ctx.save();
+					ctx.translate(this.x, this.y);
+					ctx.scale(0.6, 0.6);
+
+					var n = this.animation[this.frame];
+					//ctx.rotate(Math.PI*(n));
+					s_bird[n].draw(ctx,-s_bird[n].width/2,-s_bird[n].height/2);
+					ctx.restore();
+				}
+			});
+      keyJHeld = true;
+    }
+}
+function moveUp(){bird.y += -5;}
+function moveDown(){bird.y += 5;}
+function moveLeft(){bird.x += -5;}
+function moveRight(){bird.x += 5;}
+function clearMove(){}
+function pressKey(){
+	switch(currentstate){
+		case states.Splash:
+			if(keySPACE){
+				if(!keySPACEHeld){
+					music.play();
+					music.loop = true;
+					currentstate = states.Game;
+				} keySPACEHeld = true;
+			}
+			break;
+		case states.Game:
+			if(keyJ) shoot();
+	    if(keyW) moveUp();
+	    if(keyA) moveLeft();
+	    if(keyS) moveDown();
+	    if(keyD) moveRight();
+			break;
+		case states.Score:
+			if(keySPACE){
+				if(!keySPACEHeld){
+					enemies.reset();
+					bullets.reset();
+					score = 0;
+					bird.velocity = 0;
+					currentstate = states.Splash;
+				} keySPACEHeld = true;
+			}
+			break;
+	}
+}
+
+main();
+</script>
+</body>
+</html>
